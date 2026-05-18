@@ -1,0 +1,6 @@
+node_modules/
+dist/
+data/atendimento.db
+data/*.db
+.env
+*.log

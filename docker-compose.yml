@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  whatsapp-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whatsapp-ai-atendimento
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL:-http://localhost:8080}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - EVOLUTION_INSTANCE=${EVOLUTION_INSTANCE:-minha-empresa}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - COMPANY_NAME=${COMPANY_NAME:-Minha Empresa}
+      - OPERATOR_PHONE=${OPERATOR_PHONE:-5511999999999}
+      - DATABASE_PATH=/app/data/atendimento.db
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - whatsapp-network
+
+networks:
+  whatsapp-network:
+    driver: bridge
