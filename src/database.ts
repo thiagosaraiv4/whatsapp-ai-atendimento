@@ -123,7 +123,8 @@ export function getOrCreateConversation(phone: string): Conversation {
 export function updateConversationState(
   conversationId: number,
   state: string,
-  stateData?: Record<string, unknown>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  stateData?: any
 ): void {
   const database = getDb();
   database

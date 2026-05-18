@@ -193,10 +193,10 @@ export async function webhookRoutes(
   /**
    * Generic catch-all for other Evolution API event types
    */
-  fastify.post<{ Body: Record<string, unknown> }>(
+  fastify.post<{ Body: EvolutionWebhookBody }>(
     '/',
     async (request, reply) => {
-      const body = request.body as EvolutionWebhookBody;
+      const body = request.body as unknown as EvolutionWebhookBody;
       console.log(`[Webhook] Received generic event: ${body?.event || 'unknown'}`);
       return reply.code(200).send({ success: true });
     }
