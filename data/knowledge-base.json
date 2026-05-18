@@ -1,0 +1,97 @@
+{
+  "company": {
+    "name": "Minha Empresa Serviços",
+    "description": "Somos uma empresa especializada em serviços profissionais de alta qualidade. Nosso compromisso é com a satisfação total dos nossos clientes, oferecendo atendimento personalizado e soluções eficientes para cada necessidade.",
+    "address": "Rua das Flores, 123 – Centro – São Paulo/SP – CEP: 01310-000",
+    "phone": "+55 (11) 3000-0000",
+    "email": "contato@minhaempresa.com.br",
+    "website": "www.minhaempresa.com.br",
+    "hours": {
+      "weekdays": "Segunda a Sexta: 8h às 18h",
+      "saturday": "Sábado: 8h às 13h",
+      "sunday": "Domingo: Fechado"
+    },
+    "payment_methods": ["PIX", "Cartão de Crédito (até 12x)", "Cartão de Débito", "Dinheiro", "Transferência Bancária"],
+    "cancellation_policy": "Cancelamentos devem ser realizados com pelo menos 24 horas de antecedência pelo WhatsApp. Cancelamentos com menos de 24h poderão gerar cobrança de taxa de 30% do valor do serviço. Reagendamentos podem ser feitos sem custo adicional."
+  },
+  "services": [
+    {
+      "name": "Consultoria Inicial",
+      "description": "Análise completa das necessidades do cliente com elaboração de diagnóstico e plano de ação personalizado.",
+      "price": "R$ 150,00",
+      "duration": "1 hora"
+    },
+    {
+      "name": "Assessoria Mensal",
+      "description": "Acompanhamento mensal com reuniões periódicas, suporte contínuo via WhatsApp e relatórios de progresso.",
+      "price": "R$ 800,00/mês",
+      "duration": "Contrato mensal"
+    },
+    {
+      "name": "Treinamento em Equipe",
+      "description": "Capacitação personalizada para equipes de até 10 pessoas, com material didático incluso e certificado de participação.",
+      "price": "R$ 1.200,00",
+      "duration": "4 horas"
+    },
+    {
+      "name": "Elaboração de Projetos",
+      "description": "Desenvolvimento de projetos completos com documentação técnica, cronograma e acompanhamento da execução.",
+      "price": "A partir de R$ 2.500,00",
+      "duration": "Variável conforme escopo"
+    },
+    {
+      "name": "Revisão e Auditoria",
+      "description": "Análise detalhada de processos existentes com identificação de melhorias e entrega de relatório técnico.",
+      "price": "R$ 600,00",
+      "duration": "3 horas"
+    },
+    {
+      "name": "Suporte Técnico Avulso",
+      "description": "Atendimento pontual para resolução de dúvidas e problemas específicos, sem necessidade de contrato.",
+      "price": "R$ 120,00/hora",
+      "duration": "Mínimo 1 hora"
+    }
+  ],
+  "faqs": [
+    {
+      "question": "Como faço para agendar um serviço?",
+      "answer": "É muito simples! Você pode agendar diretamente por este WhatsApp informando o serviço desejado, data e horário de sua preferência. Nossa equipe confirmará a disponibilidade em seguida.",
+      "tags": ["agendamento", "como agendar"]
+    },
+    {
+      "question": "Vocês atendem em domicílio?",
+      "answer": "Sim! Oferecemos atendimento presencial no nosso escritório ou em domicílio/empresa do cliente. Para atendimentos externos, pode haver cobrança adicional de deslocamento dependendo da localização. Consulte-nos para mais detalhes.",
+      "tags": ["domicílio", "presencial", "atendimento externo"]
+    },
+    {
+      "question": "Quanto tempo leva para iniciar após o agendamento?",
+      "answer": "Após a confirmação do agendamento, o prazo de início varia conforme o serviço. Consultorias iniciais geralmente acontecem em até 3 dias úteis. Projetos maiores podem ter prazo de 5 a 10 dias úteis para início.",
+      "tags": ["prazo", "início", "tempo"]
+    },
+    {
+      "question": "Posso pagar parcelado?",
+      "answer": "Sim! Aceitamos parcelamento em até 12x no cartão de crédito sem juros para valores acima de R$ 300,00. Para pagamento via PIX ou dinheiro, oferecemos 5% de desconto.",
+      "tags": ["parcelamento", "pagamento", "parcelas", "desconto"]
+    },
+    {
+      "question": "Existe contrato de fidelidade?",
+      "answer": "Não exigimos fidelidade nos planos mensais. Você pode cancelar o serviço com 30 dias de antecedência sem multa. Nosso compromisso é manter a qualidade para que você queira continuar por vontade própria.",
+      "tags": ["contrato", "fidelidade", "cancelamento", "multa"]
+    },
+    {
+      "question": "Vocês emitem nota fiscal?",
+      "answer": "Sim, emitimos Nota Fiscal Eletrônica (NF-e) para todos os serviços. A nota é enviada automaticamente por e-mail após a confirmação do pagamento.",
+      "tags": ["nota fiscal", "NFe", "recibo"]
+    },
+    {
+      "question": "Como funciona o suporte pós-atendimento?",
+      "answer": "Oferecemos suporte pós-atendimento por 7 dias para esclarecimento de dúvidas relacionadas ao serviço prestado, sem custo adicional. Para suporte estendido, recomendamos o plano de Assessoria Mensal.",
+      "tags": ["suporte", "pós-venda", "garantia", "dúvidas"]
+    },
+    {
+      "question": "Posso solicitar orçamento sem compromisso?",
+      "answer": "Claro! Basta nos informar sua necessidade por aqui e elaboramos um orçamento detalhado sem qualquer compromisso. Respondemos orçamentos em até 2 horas durante o horário comercial.",
+      "tags": ["orçamento", "preço", "valor", "cotação"]
+    }
+  ]
+}
