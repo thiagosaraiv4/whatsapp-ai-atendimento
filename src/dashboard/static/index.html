@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WhatsApp AI - Painel de Atendimento</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <div class="logo-icon">💬</div>
+          <div class="logo-text">
+            <span class="logo-title">WhatsApp AI</span>
+            <span class="logo-subtitle">Atendimento</span>
+          </div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-view="conversations" onclick="switchView('conversations')">
+          <span class="nav-icon">💬</span>
+          <span class="nav-label">Conversas</span>
+        </button>
+        <button class="nav-item" data-view="appointments" onclick="switchView('appointments')">
+          <span class="nav-icon">📅</span>
+          <span class="nav-label">Agendamentos</span>
+        </button>
+        <button class="nav-item" data-view="metrics" onclick="switchView('metrics')">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Métricas</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="auto-refresh-info" id="refreshStatus">
+          <span class="refresh-dot" id="refreshDot"></span>
+          <span id="refreshText">Atualizando...</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Conversations View -->
+      <div id="view-conversations" class="view active">
+        <div class="view-layout conversations-layout">
+          <!-- Conversations List -->
+          <div class="panel conversations-panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Conversas</h2>
+              <div class="panel-actions">
+                <div class="search-box">
+                  <span class="search-icon">🔍</span>
+                  <input type="text" id="searchInput" placeholder="Buscar por número ou nome..." oninput="filterConversations()" />
+                </div>
+                <div class="filter-group">
+                  <select id="statusFilter" onchange="filterConversations()">
+                    <option value="">Todos</option>
+                    <option value="active">Ativos</option>
+                    <option value="escalated">Escalonados</option>
+                    <option value="closed">Fechados</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="conversations-list" id="conversationsList">
+              <div class="loading-state">
+                <div class="spinner"></div>
+                <span>Carregando conversas...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat Panel -->
+          <div class="panel chat-panel" id="chatPanel">
+            <div class="chat-empty" id="chatEmpty">
+              <div class="chat-empty-icon">💬</div>
+              <p>Selecione uma conversa para ver o histórico</p>
+            </div>
+            <div class="chat-view" id="chatView" style="display:none;">
+              <div class="chat-header" id="chatHeader">
+                <div class="chat-contact">
+                  <div class="contact-avatar" id="contactAvatar">?</div>
+                  <div class="contact-info">
+                    <div class="contact-name" id="contactName">—</div>
+                    <div class="contact-phone" id="contactPhone">—</div>
+                  </div>
+                </div>
+                <div class="chat-header-badge" id="chatStatusBadge"></div>
+                <div class="chat-actions">
+                  <button class="btn btn-sm btn-warning" id="btnEscalate" onclick="escalateConversation()">
+                    ⚡ Escalonar
+                  </button>
+                  <button class="btn btn-sm btn-danger" id="btnClose" onclick="closeConversation()">
+                    ✕ Fechar
+                  </button>
+                  <button class="btn btn-sm btn-success" id="btnReopen" onclick="reopenConversation()" style="display:none;">
+                    ↩ Reabrir
+                  </button>
+                </div>
+              </div>
+              <div class="chat-messages" id="chatMessages"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Appointments View -->
+      <div id="view-appointments" class="view">
+        <div class="panel full-panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Agendamentos</h2>
+            <div class="panel-actions">
+              <select id="appointmentFilter" onchange="loadAppointments()">
+                <option value="">Todos</option>
+                <option value="pending">Pendentes</option>
+                <option value="confirmed">Confirmados</option>
+                <option value="cancelled">Cancelados</option>
+              </select>
+            </div>
+          </div>
+          <div id="appointmentsContainer">
+            <div class="loading-state">
+              <div class="spinner"></div>
+              <span>Carregando agendamentos...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metrics View -->
+      <div id="view-metrics" class="view">
+        <div class="metrics-grid" id="metricsGrid">
+          <div class="loading-state full-width">
+            <div class="spinner"></div>
+            <span>Carregando métricas...</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <!-- Escalate Modal -->
+  <div id="escalateModal" class="modal-overlay" style="display:none;" onclick="closeModal('escalateModal')">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Escalonar Conversa</h3>
+        <button class="modal-close" onclick="closeModal('escalateModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <label for="escalateReason">Motivo do escalonamento:</label>
+        <textarea id="escalateReason" rows="3" placeholder="Descreva o motivo para escalonar esta conversa..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('escalateModal')">Cancelar</button>
+        <button class="btn btn-warning" onclick="confirmEscalate()">⚡ Confirmar Escalonamento</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
