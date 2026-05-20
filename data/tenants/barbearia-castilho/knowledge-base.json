@@ -1,0 +1,24 @@
+{
+  "company": {
+    "name": "Barbearia Castilho",
+    "description": "Barbearia especializada em cortes masculinos modernos e clássicos",
+    "address": "A definir",
+    "hours": "Segunda a Sábado: 9h às 19h",
+    "instagram": "@barbearia.castilho"
+  },
+  "services": [
+    { "name": "Corte", "price": "R$ 45", "duration": "45 min" },
+    { "name": "Barba", "price": "R$ 35", "duration": "30 min" },
+    { "name": "Corte + Barba", "price": "R$ 70", "duration": "1h 15min" },
+    { "name": "Hidratação", "price": "R$ 40", "duration": "30 min" },
+    { "name": "Sobrancelha", "price": "R$ 20", "duration": "15 min" }
+  ],
+  "payment": ["Pix", "Dinheiro", "Cartão de débito", "Cartão de crédito"],
+  "faq": [
+    { "q": "Preciso agendar?", "a": "Recomendamos agendamento para garantir seu horário, mas também atendemos por ordem de chegada quando há disponibilidade." },
+    { "q": "Vocês atendem criança?", "a": "Sim! Atendemos crianças a partir de 3 anos." },
+    { "q": "Quanto tempo demora um corte?", "a": "Em média 45 minutos. Corte + barba leva cerca de 1h15min." },
+    { "q": "Posso cancelar meu agendamento?", "a": "Sim, cancele com pelo menos 2 horas de antecedência pelo WhatsApp." },
+    { "q": "Qual a forma de pagamento preferida?", "a": "Aceitamos Pix, dinheiro e cartão. Pix e dinheiro preferencial." }
+  ]
+}

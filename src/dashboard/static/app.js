@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════
-   WhatsApp AI Dashboard - app.js
+   WhatsApp AI Dashboard - app.js (multi-tenant)
 ══════════════════════════════════════ */
 
 'use strict';
@@ -8,13 +8,68 @@
 let allConversations = [];
 let selectedConversationId = null;
 let refreshInterval = null;
+let allTenants = [];
+let selectedTenantId = null; // null = all tenants
 const REFRESH_INTERVAL_MS = 10000; // 10 seconds
 
 // ── Init ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  loadConversations();
-  startAutoRefresh();
+  loadTenants().then(() => {
+    loadConversations();
+    startAutoRefresh();
+  });
 });
+
+// ── Tenant selector ────────────────────────────────────
+async function loadTenants() {
+  try {
+    const res = await fetch('/api/tenants');
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error);
+
+    allTenants = json.data || [];
+    const select = document.getElementById('tenantSelect');
+    if (!select) return;
+
+    // Clear existing options except first
+    while (select.options.length > 1) select.remove(1);
+
+    allTenants.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.name;
+      select.appendChild(opt);
+    });
+  } catch (err) {
+    console.error('[App] Failed to load tenants:', err);
+  }
+}
+
+function onTenantChange() {
+  const select = document.getElementById('tenantSelect');
+  selectedTenantId = select?.value ? parseInt(select.value, 10) : null;
+
+  // Reload current view with new tenant filter
+  const activeView = document.querySelector('.view.active');
+  if (!activeView) return;
+  const viewId = activeView.id;
+  if (viewId === 'view-conversations') {
+    selectedConversationId = null;
+    document.getElementById('chatEmpty').style.display = 'flex';
+    document.getElementById('chatView').style.display = 'none';
+    loadConversations();
+  }
+  if (viewId === 'view-appointments') loadAppointments();
+  if (viewId === 'view-metrics') loadMetrics();
+}
+
+function getTenantById(id) {
+  return allTenants.find(t => t.id === id) || null;
+}
+
+function getTenantQueryParam() {
+  return selectedTenantId ? `tenant_id=${selectedTenantId}` : '';
+}
 
 // ── View switching ─────────────────────────────────────
 function switchView(view) {
@@ -69,7 +124,9 @@ async function loadConversations(silent = false) {
   }
 
   try {
-    const res = await fetch('/api/conversations');
+    const param = getTenantQueryParam();
+    const url = param ? `/api/conversations?${param}` : '/api/conversations';
+    const res = await fetch(url);
     const json = await res.json();
     if (!json.success) throw new Error(json.error);
 
@@ -119,6 +176,10 @@ function renderConversationsList(conversations) {
     const timeStr = formatTime(c.last_message_time || c.updated_at);
     const preview = c.last_message ? truncate(c.last_message, 55) : 'Sem mensagens';
     const isSelected = c.id === selectedConversationId;
+    const tenantInfo = getTenantById(c.tenant_id);
+    const tenantBadge = tenantInfo && allTenants.length > 1
+      ? `<span class="tenant-badge">${escHtml(tenantInfo.name)}</span>`
+      : '';
 
     return `
       <div class="conversation-item ${isSelected ? 'selected' : ''}" onclick="selectConversation(${c.id})">
@@ -132,6 +193,7 @@ function renderConversationsList(conversations) {
             <span class="conv-status-dot ${c.status}"></span>
             ${escHtml(preview)}
           </div>
+          ${tenantBadge ? `<div class="conv-tenant">${tenantBadge}</div>` : ''}
         </div>
       </div>`;
   }).join('');
@@ -143,15 +205,6 @@ function filterConversations() {
 
 async function selectConversation(id) {
   selectedConversationId = id;
-
-  // Update selected state in list
-  document.querySelectorAll('.conversation-item').forEach(el => el.classList.remove('selected'));
-  const items = document.querySelectorAll('.conversation-item');
-  items.forEach(item => {
-    if (item.onclick?.toString().includes(`(${id})`)) {
-      item.classList.add('selected');
-    }
-  });
 
   // Re-render list to show selection properly
   renderConversationsList(allConversations);
@@ -186,7 +239,12 @@ async function loadChatMessages(id, silent = false) {
     document.getElementById('contactName').textContent = name;
     document.getElementById('contactPhone').textContent = formatPhone(conversation.phone);
     document.getElementById('contactAvatar').textContent = getInitials(conversation.name, conversation.phone);
-    document.getElementById('chatStatusBadge').innerHTML = `<span class="badge badge-${conversation.status}">${statusLabel(conversation.status)}</span>`;
+
+    const tenantInfo = getTenantById(conversation.tenant_id);
+    const tenantTag = tenantInfo ? ` · ${tenantInfo.name}` : '';
+    document.getElementById('chatStatusBadge').innerHTML =
+      `<span class="badge badge-${conversation.status}">${statusLabel(conversation.status)}</span>` +
+      (tenantTag ? `<span class="badge badge-tenant">${escHtml(tenantTag)}</span>` : '');
 
     chatEmpty.style.display = 'none';
     chatView.style.display = 'flex';
@@ -318,7 +376,12 @@ async function loadAppointments(silent = false) {
   }
 
   try {
-    const url = filter ? `/api/appointments?status=${filter}` : '/api/appointments';
+    const params = [];
+    if (filter) params.push(`status=${filter}`);
+    const tenantParam = getTenantQueryParam();
+    if (tenantParam) params.push(tenantParam);
+    const url = `/api/appointments${params.length ? '?' + params.join('&') : ''}`;
+
     const res = await fetch(url);
     const json = await res.json();
     if (!json.success) throw new Error(json.error);
@@ -340,20 +403,25 @@ async function loadAppointments(silent = false) {
           <thead>
             <tr>
               <th>#</th>
+              <th>Empresa</th>
               <th>Cliente</th>
               <th>WhatsApp</th>
-              <th>Serviço</th>
-              <th>Data</th>
-              <th>Horário</th>
+              <th>Serviço / Demanda</th>
+              <th>Data / Dias</th>
+              <th>Horário / Período</th>
               <th>Observações</th>
               <th>Status</th>
               <th>Ações</th>
             </tr>
           </thead>
           <tbody>
-            ${appointments.map(a => `
+            ${appointments.map(a => {
+              const tenant = getTenantById(a.tenant_id);
+              const isPsychology = tenant?.type === 'collect_forward';
+              return `
               <tr>
                 <td>${a.id}</td>
+                <td>${escHtml(tenant?.name || '—')}</td>
                 <td>${escHtml(a.name)}</td>
                 <td>${formatPhone(a.phone)}</td>
                 <td>${escHtml(a.service)}</td>
@@ -363,9 +431,13 @@ async function loadAppointments(silent = false) {
                 <td><span class="badge badge-${a.status}">${appointmentStatusLabel(a.status)}</span></td>
                 <td>
                   <div class="table-actions">
-                    ${a.status === 'pending' ? `
-                      <button class="btn btn-sm btn-success" onclick="updateAppointment(${a.id}, 'confirmed')">✓ Confirmar</button>
-                      <button class="btn btn-sm btn-danger" onclick="updateAppointment(${a.id}, 'cancelled')">✕ Cancelar</button>
+                    ${a.status === 'pending' || a.status === 'pending_professional' ? `
+                      <button class="btn btn-sm btn-success" onclick="updateAppointment(${a.id}, 'confirmed')">
+                        ${isPsychology ? '✓ Confirmar Consulta' : '✓ Confirmar'}
+                      </button>
+                      <button class="btn btn-sm btn-danger" onclick="updateAppointment(${a.id}, 'cancelled')">
+                        ${isPsychology ? '✕ Recusar' : '✕ Cancelar'}
+                      </button>
                     ` : a.status === 'confirmed' ? `
                       <button class="btn btn-sm btn-danger" onclick="updateAppointment(${a.id}, 'cancelled')">✕ Cancelar</button>
                     ` : `
@@ -373,8 +445,8 @@ async function loadAppointments(silent = false) {
                     `}
                   </div>
                 </td>
-              </tr>
-            `).join('')}
+              </tr>`;
+            }).join('')}
           </tbody>
         </table>
       </div>`;
@@ -389,7 +461,7 @@ async function loadAppointments(silent = false) {
 }
 
 async function updateAppointment(id, status) {
-  const labels = { confirmed: 'confirmar', cancelled: 'cancelar', pending: 'reabrir' };
+  const labels = { confirmed: 'confirmar', cancelled: 'cancelar/recusar', pending: 'reabrir' };
   if (!confirm(`Deseja ${labels[status] || 'atualizar'} este agendamento?`)) return;
 
   try {
@@ -420,11 +492,16 @@ async function loadMetrics(silent = false) {
   }
 
   try {
-    const res = await fetch('/api/metrics');
+    const param = getTenantQueryParam();
+    const url = param ? `/api/metrics?${param}` : '/api/metrics';
+    const res = await fetch(url);
     const json = await res.json();
     if (!json.success) throw new Error(json.error);
 
     const m = json.data;
+    const tenantName = selectedTenantId
+      ? (getTenantById(selectedTenantId)?.name || 'Empresa selecionada')
+      : 'Todas as empresas';
 
     const cards = [
       { icon: '💬', value: m.total_conversations, label: 'Total de Conversas', color: 'blue' },
@@ -439,7 +516,9 @@ async function loadMetrics(silent = false) {
       { icon: '📬', value: m.total_messages, label: 'Total de Mensagens', color: '' },
     ];
 
-    grid.innerHTML = cards.map(c => `
+    grid.innerHTML =
+      `<div class="metrics-tenant-label full-width">📊 Métricas — ${escHtml(tenantName)}</div>` +
+      cards.map(c => `
       <div class="metric-card ${c.color}">
         <div class="metric-icon">${c.icon}</div>
         <div class="metric-value">${c.value ?? 0}</div>
@@ -551,6 +630,11 @@ function statusLabel(status) {
 }
 
 function appointmentStatusLabel(status) {
-  const labels = { pending: 'Pendente', confirmed: 'Confirmado', cancelled: 'Cancelado' };
+  const labels = {
+    pending: 'Pendente',
+    confirmed: 'Confirmado',
+    cancelled: 'Cancelado',
+    pending_professional: 'Aguardando Profissional',
+  };
   return labels[status] || status;
 }

@@ -1,10 +1,21 @@
 import Groq from 'groq-sdk';
 import fs from 'fs';
+import path from 'path';
 import { config } from '../config';
+import { TenantWithConfig } from '../database';
 
-interface KnowledgeBaseEntry {
-  question: string;
-  answer: string;
+interface KnowledgeBaseService {
+  name: string;
+  price: string;
+  duration: string;
+  description?: string;
+}
+
+interface KnowledgeFaq {
+  q?: string;
+  question?: string;
+  a?: string;
+  answer?: string;
   tags?: string[];
 }
 
@@ -12,25 +23,19 @@ interface KnowledgeBase {
   company: {
     name: string;
     description: string;
-    address: string;
-    phone: string;
-    email: string;
+    address?: string;
+    phone?: string;
+    email?: string;
     website?: string;
-    hours: {
-      weekdays: string;
-      saturday: string;
-      sunday: string;
-    };
-    payment_methods: string[];
-    cancellation_policy: string;
+    instagram?: string;
+    hours?: string | { weekdays?: string; saturday?: string; sunday?: string };
+    payment_methods?: string[];
+    cancellation_policy?: string;
   };
-  services: Array<{
-    name: string;
-    description: string;
-    price: string;
-    duration: string;
-  }>;
-  faqs: KnowledgeBaseEntry[];
+  services?: KnowledgeBaseService[];
+  payment?: string[];
+  faq?: KnowledgeFaq[];
+  faqs?: KnowledgeFaq[];
 }
 
 export interface DetectedIntent {
@@ -48,7 +53,8 @@ export interface DetectedIntent {
 
 class AIService {
   private groq: Groq;
-  private knowledgeBase: KnowledgeBase | null = null;
+  // Cache per-tenant: slug → KnowledgeBase
+  private kbCache: Map<string, KnowledgeBase> = new Map();
 
   constructor() {
     this.groq = new Groq({
@@ -56,78 +62,101 @@ class AIService {
     });
   }
 
-  private loadKnowledgeBase(): KnowledgeBase {
-    if (this.knowledgeBase) return this.knowledgeBase;
+  private loadKnowledgeBaseForTenant(tenant: TenantWithConfig): KnowledgeBase {
+    const cached = this.kbCache.get(tenant.slug);
+    if (cached) return cached;
 
-    try {
-      const raw = fs.readFileSync(config.KNOWLEDGE_BASE_PATH, 'utf-8');
-      this.knowledgeBase = JSON.parse(raw) as KnowledgeBase;
-      console.log('[AI] Knowledge base loaded successfully');
-      return this.knowledgeBase;
-    } catch (err) {
-      console.error('[AI] Failed to load knowledge base:', err);
-      // Return minimal fallback
-      this.knowledgeBase = {
-        company: {
-          name: config.COMPANY_NAME,
-          description: 'Empresa de serviços profissionais',
-          address: 'Consulte pelo WhatsApp',
-          phone: config.OPERATOR_PHONE,
-          email: 'contato@empresa.com',
-          hours: {
-            weekdays: 'Segunda a Sexta: 8h às 18h',
-            saturday: 'Sábado: 8h às 12h',
-            sunday: 'Domingo: Fechado',
-          },
-          payment_methods: ['PIX', 'Cartão de Crédito', 'Cartão de Débito', 'Dinheiro'],
-          cancellation_policy:
-            'Cancelamentos devem ser feitos com pelo menos 24 horas de antecedência.',
-        },
-        services: [],
-        faqs: [],
-      };
-      return this.knowledgeBase;
+    // Try tenant-specific KB first
+    const tenantKbPath = path.join(config.TENANTS_DATA_PATH, tenant.slug, 'knowledge-base.json');
+    if (fs.existsSync(tenantKbPath)) {
+      try {
+        const raw = fs.readFileSync(tenantKbPath, 'utf-8');
+        const kb = JSON.parse(raw) as KnowledgeBase;
+        this.kbCache.set(tenant.slug, kb);
+        console.log(`[AI] Knowledge base loaded for tenant: ${tenant.slug}`);
+        return kb;
+      } catch (err) {
+        console.error(`[AI] Failed to load KB for tenant ${tenant.slug}:`, err);
+      }
     }
+
+    // Fallback: legacy KB
+    if (fs.existsSync(config.KNOWLEDGE_BASE_PATH)) {
+      try {
+        const raw = fs.readFileSync(config.KNOWLEDGE_BASE_PATH, 'utf-8');
+        const kb = JSON.parse(raw) as KnowledgeBase;
+        this.kbCache.set(tenant.slug, kb);
+        console.log(`[AI] Using legacy knowledge base for tenant: ${tenant.slug}`);
+        return kb;
+      } catch (err) {
+        console.error('[AI] Failed to load legacy knowledge base:', err);
+      }
+    }
+
+    // Minimal fallback
+    const fallback: KnowledgeBase = {
+      company: {
+        name: tenant.name,
+        description: 'Serviços profissionais',
+      },
+      services: [],
+      faq: [],
+    };
+    this.kbCache.set(tenant.slug, fallback);
+    return fallback;
   }
 
-  private buildSystemPrompt(): string {
-    const kb = this.loadKnowledgeBase();
+  private buildSystemPrompt(tenant: TenantWithConfig): string {
+    const kb = this.loadKnowledgeBaseForTenant(tenant);
+    const tc = tenant.config;
 
-    const servicesText = kb.services
-      .map(
-        (s) =>
-          `  • ${s.name}: ${s.description} | Preço: ${s.price} | Duração: ${s.duration}`
-      )
+    // Normalize services
+    const services = kb.services || [];
+    const servicesText = services
+      .map((s) => `  • ${s.name}: ${s.description || ''} | Preço: ${s.price} | Duração: ${s.duration}`)
       .join('\n');
 
-    const faqsText = kb.faqs
-      .map((f) => `  P: ${f.question}\n  R: ${f.answer}`)
+    // Normalize faqs
+    const faqs: KnowledgeFaq[] = kb.faq || kb.faqs || [];
+    const faqsText = faqs
+      .map((f) => `  P: ${f.q || f.question || ''}\n  R: ${f.a || f.answer || ''}`)
       .join('\n\n');
 
-    const paymentMethods = kb.company.payment_methods.join(', ');
+    // Payment methods
+    const paymentMethods = (kb.payment || kb.company.payment_methods || []).join(', ');
+
+    // Hours
+    let hoursText = '';
+    if (typeof kb.company.hours === 'string') {
+      hoursText = kb.company.hours;
+    } else if (kb.company.hours) {
+      const h = kb.company.hours;
+      const parts: string[] = [];
+      if (h.weekdays) parts.push(h.weekdays);
+      if (h.saturday) parts.push(h.saturday);
+      if (h.sunday) parts.push(h.sunday);
+      hoursText = parts.map((p) => `- ${p}`).join('\n');
+    }
+
+    const cancellationPolicy = tc.cancellation_policy || kb.company.cancellation_policy || '';
 
     return `Você é o assistente virtual de atendimento da ${kb.company.name}.
 
 ## SOBRE A EMPRESA
 ${kb.company.description}
-
-**Endereço:** ${kb.company.address}
-**Telefone:** ${kb.company.phone}
-**E-mail:** ${kb.company.email}${kb.company.website ? `\n**Site:** ${kb.company.website}` : ''}
+${kb.company.address ? `\n**Endereço:** ${kb.company.address}` : ''}${kb.company.phone ? `\n**Telefone:** ${kb.company.phone}` : ''}${kb.company.email ? `\n**E-mail:** ${kb.company.email}` : ''}${kb.company.website ? `\n**Site:** ${kb.company.website}` : ''}${kb.company.instagram ? `\n**Instagram:** ${kb.company.instagram}` : ''}
 
 ## HORÁRIOS DE FUNCIONAMENTO
-- ${kb.company.hours.weekdays}
-- ${kb.company.hours.saturday}
-- ${kb.company.hours.sunday}
+${hoursText || 'Consulte nossos horários pelo WhatsApp.'}
 
 ## SERVIÇOS OFERECIDOS
 ${servicesText || '  (Consulte os serviços disponíveis com nossa equipe)'}
 
 ## FORMAS DE PAGAMENTO
-${paymentMethods}
+${paymentMethods || 'Consulte formas de pagamento.'}
 
 ## POLÍTICA DE CANCELAMENTO
-${kb.company.cancellation_policy}
+${cancellationPolicy || 'Cancelamentos devem ser feitos com antecedência.'}
 
 ## PERGUNTAS FREQUENTES
 ${faqsText || '  (Nenhuma FAQ configurada)'}
@@ -163,9 +192,10 @@ ${faqsText || '  (Nenhuma FAQ configurada)'}
 
   async chat(
     history: Array<{ role: 'user' | 'assistant'; content: string }>,
-    userMessage: string
+    userMessage: string,
+    tenant: TenantWithConfig
   ): Promise<string> {
-    const systemPrompt = this.buildSystemPrompt();
+    const systemPrompt = this.buildSystemPrompt(tenant);
 
     const messages: Groq.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemPrompt },
@@ -226,9 +256,12 @@ ${faqsText || '  (Nenhuma FAQ configurada)'}
     };
   }
 
-  reloadKnowledgeBase(): void {
-    this.knowledgeBase = null;
-    this.loadKnowledgeBase();
+  reloadKnowledgeBase(tenantSlug?: string): void {
+    if (tenantSlug) {
+      this.kbCache.delete(tenantSlug);
+    } else {
+      this.kbCache.clear();
+    }
   }
 }
 

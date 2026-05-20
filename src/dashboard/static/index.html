@@ -20,6 +20,14 @@
         </div>
       </div>
 
+      <!-- Tenant Selector -->
+      <div class="tenant-selector">
+        <label class="tenant-label" for="tenantSelect">Empresa</label>
+        <select id="tenantSelect" onchange="onTenantChange()">
+          <option value="">Todas as empresas</option>
+        </select>
+      </div>
+
       <nav class="sidebar-nav">
         <button class="nav-item active" data-view="conversations" onclick="switchView('conversations')">
           <span class="nav-icon">💬</span>
@@ -118,6 +126,7 @@
               <select id="appointmentFilter" onchange="loadAppointments()">
                 <option value="">Todos</option>
                 <option value="pending">Pendentes</option>
+                <option value="pending_professional">Aguardando Profissional</option>
                 <option value="confirmed">Confirmados</option>
                 <option value="cancelled">Cancelados</option>
               </select>

@@ -1,0 +1,12 @@
+{
+  "company": {
+    "name": "Psicóloga Prylucki",
+    "description": "Atendimento psicológico individual",
+    "instagram": "@psicologa.prylucki"
+  },
+  "faq": [
+    { "q": "Como funciona o agendamento?", "a": "Coletamos seus dados e preferências de horário e encaminhamos para a psicóloga, que entrará em contato para confirmar." },
+    { "q": "O atendimento é presencial ou online?", "a": "Oferecemos ambas as modalidades. Informe sua preferência durante o agendamento." },
+    { "q": "Quanto custa a consulta?", "a": "Os valores são informados diretamente pela psicóloga no primeiro contato." }
+  ]
+}

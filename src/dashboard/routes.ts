@@ -10,6 +10,8 @@ import {
   getMetrics,
   escalateConversation,
   markEscalationNotified,
+  listTenants,
+  getTenantById,
 } from '../database';
 import { whatsappService } from '../services/whatsapp';
 import { config } from '../config';
@@ -19,18 +21,44 @@ export async function dashboardRoutes(
   _options: FastifyPluginOptions
 ): Promise<void> {
   /**
-   * GET /api/conversations
-   * Returns all conversations with last message and status.
+   * GET /api/tenants
+   * Returns all active tenants.
    */
-  fastify.get('/conversations', async (_request, reply) => {
+  fastify.get('/tenants', async (_request, reply) => {
     try {
-      const conversations = listConversations();
-      return reply.code(200).send({ success: true, data: conversations });
+      const tenants = listTenants();
+      // Return without internal config details for security
+      const safe = tenants.map((t) => ({
+        id: t.id,
+        slug: t.slug,
+        name: t.name,
+        type: t.type,
+        active: t.active,
+      }));
+      return reply.code(200).send({ success: true, data: safe });
     } catch (err) {
       fastify.log.error(err);
-      return reply.code(500).send({ success: false, error: 'Failed to list conversations' });
+      return reply.code(500).send({ success: false, error: 'Failed to list tenants' });
     }
   });
+
+  /**
+   * GET /api/conversations
+   * Returns all conversations, optionally filtered by tenant_id.
+   */
+  fastify.get<{ Querystring: { tenant_id?: string } }>(
+    '/conversations',
+    async (request, reply) => {
+      try {
+        const tenantId = request.query.tenant_id ? parseInt(request.query.tenant_id, 10) : undefined;
+        const conversations = listConversations(tenantId);
+        return reply.code(200).send({ success: true, data: conversations });
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.code(500).send({ success: false, error: 'Failed to list conversations' });
+      }
+    }
+  );
 
   /**
    * GET /api/conversations/:id/messages
@@ -61,14 +89,15 @@ export async function dashboardRoutes(
 
   /**
    * GET /api/appointments
-   * Returns all appointments, optionally filtered by status.
+   * Returns all appointments, optionally filtered by status and/or tenant_id.
    */
-  fastify.get<{ Querystring: { status?: string } }>(
+  fastify.get<{ Querystring: { status?: string; tenant_id?: string } }>(
     '/appointments',
     async (request, reply) => {
       try {
         const { status } = request.query;
-        const appointments = listAppointments(status);
+        const tenantId = request.query.tenant_id ? parseInt(request.query.tenant_id, 10) : undefined;
+        const appointments = listAppointments(status, tenantId);
         return reply.code(200).send({ success: true, data: appointments });
       } catch (err) {
         fastify.log.error(err);
@@ -79,11 +108,11 @@ export async function dashboardRoutes(
 
   /**
    * PUT /api/appointments/:id
-   * Updates appointment status.
+   * Updates appointment status. For collect_forward tenants, sends WhatsApp confirmation/decline.
    */
   fastify.put<{
     Params: { id: string };
-    Body: { status: 'pending' | 'confirmed' | 'cancelled' };
+    Body: { status: 'pending' | 'confirmed' | 'cancelled' | 'pending_professional' };
   }>('/appointments/:id', async (request, reply) => {
     try {
       const id = parseInt(request.params.id, 10);
@@ -92,10 +121,10 @@ export async function dashboardRoutes(
       }
 
       const { status } = request.body;
-      if (!['pending', 'confirmed', 'cancelled'].includes(status)) {
+      if (!['pending', 'confirmed', 'cancelled', 'pending_professional'].includes(status)) {
         return reply
           .code(400)
-          .send({ success: false, error: 'Invalid status. Use: pending, confirmed, cancelled' });
+          .send({ success: false, error: 'Invalid status. Use: pending, confirmed, cancelled, pending_professional' });
       }
 
       const updated = updateAppointmentStatus(id, status);
@@ -103,24 +132,46 @@ export async function dashboardRoutes(
         return reply.code(404).send({ success: false, error: 'Appointment not found' });
       }
 
-      // Notify client if confirmed/cancelled
+      // Get tenant info to customize notifications
+      const tenant = getTenantById(updated.tenant_id);
+      const isMentalHealth = tenant?.type === 'collect_forward';
+
+      // Notify client based on status change
       try {
         if (status === 'confirmed') {
-          await whatsappService.sendTextMessage(
-            updated.phone,
-            `✅ *Seu agendamento foi confirmado!*\n\n` +
-              `📋 Serviço: ${updated.service}\n` +
-              `📅 Data: ${updated.date}\n` +
-              `🕐 Horário: ${updated.time}\n\n` +
-              `Aguardamos você! 😊`
-          );
+          if (isMentalHealth) {
+            // collect_forward confirmation message
+            await whatsappService.sendTextMessage(
+              updated.phone,
+              `✅ Sua consulta foi confirmada! A *${tenant?.name || 'Psicóloga'}* entrará em contato em breve no seu WhatsApp. 🌿`
+            );
+          } else {
+            await whatsappService.sendTextMessage(
+              updated.phone,
+              `✅ *Seu agendamento foi confirmado!*\n\n` +
+                `📋 Serviço: ${updated.service}\n` +
+                `📅 Data: ${updated.date}\n` +
+                `🕐 Horário: ${updated.time}\n\n` +
+                `Aguardamos você! 😊`
+            );
+          }
         } else if (status === 'cancelled') {
-          await whatsappService.sendTextMessage(
-            updated.phone,
-            `❌ *Seu agendamento foi cancelado.*\n\n` +
-              `📋 Serviço: ${updated.service} — ${updated.date} às ${updated.time}\n\n` +
-              `Se desejar reagendar, entre em contato conosco pelo WhatsApp.`
-          );
+          if (isMentalHealth) {
+            await whatsappService.sendTextMessage(
+              updated.phone,
+              `Olá, ${updated.name}! 🌿\n\n` +
+                `Infelizmente não será possível confirmar sua consulta no momento. ` +
+                `Mas não se preocupe — você pode entrar em contato novamente quando quiser. ` +
+                `Estamos aqui para ajudar! 💙`
+            );
+          } else {
+            await whatsappService.sendTextMessage(
+              updated.phone,
+              `❌ *Seu agendamento foi cancelado.*\n\n` +
+                `📋 Serviço: ${updated.service} — ${updated.date} às ${updated.time}\n\n` +
+                `Se desejar reagendar, entre em contato conosco pelo WhatsApp.`
+            );
+          }
         }
       } catch (notifyErr) {
         fastify.log.warn(`Failed to notify client about appointment status change: ${notifyErr}`);
@@ -135,17 +186,21 @@ export async function dashboardRoutes(
 
   /**
    * GET /api/metrics
-   * Returns dashboard metrics.
+   * Returns dashboard metrics, optionally filtered by tenant_id.
    */
-  fastify.get('/metrics', async (_request, reply) => {
-    try {
-      const metrics = getMetrics();
-      return reply.code(200).send({ success: true, data: metrics });
-    } catch (err) {
-      fastify.log.error(err);
-      return reply.code(500).send({ success: false, error: 'Failed to get metrics' });
+  fastify.get<{ Querystring: { tenant_id?: string } }>(
+    '/metrics',
+    async (request, reply) => {
+      try {
+        const tenantId = request.query.tenant_id ? parseInt(request.query.tenant_id, 10) : undefined;
+        const metrics = getMetrics(tenantId);
+        return reply.code(200).send({ success: true, data: metrics });
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.code(500).send({ success: false, error: 'Failed to get metrics' });
+      }
     }
-  });
+  );
 
   /**
    * POST /api/conversations/:id/close
@@ -202,17 +257,25 @@ export async function dashboardRoutes(
       }
 
       const reason = request.body?.reason || 'Escalonamento manual pelo operador';
-      const escalation = escalateConversation(id, reason);
+      const escalation = escalateConversation(id, reason, conversation.tenant_id);
+
+      // Get operator phone — prefer tenant operator, fallback to global
+      let operatorPhone = config.OPERATOR_PHONE;
+      const tenant = getTenantById(conversation.tenant_id);
+      if (tenant?.operator_phone) {
+        operatorPhone = tenant.operator_phone;
+      }
 
       // Notify operator
       const operatorMsg =
-        `🚨 *Atendimento Escalonado Manualmente*\n\n` +
-        `📱 Cliente: ${conversation.phone}\n` +
+        `🚨 *Atendimento Escalonado Manualmente*\n` +
+        (tenant ? `🏢 Tenant: ${tenant.name}\n` : '') +
+        `\n📱 Cliente: ${conversation.phone}\n` +
         (conversation.name ? `👤 Nome: ${conversation.name}\n` : '') +
         `📝 Motivo: ${reason}`;
 
       try {
-        await whatsappService.sendTextMessage(config.OPERATOR_PHONE, operatorMsg);
+        await whatsappService.sendTextMessage(operatorPhone, operatorMsg);
         markEscalationNotified(escalation.id);
       } catch (notifyErr) {
         fastify.log.warn(`Failed to notify operator: ${notifyErr}`);
@@ -273,7 +336,7 @@ export async function dashboardRoutes(
       success: true,
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      version: '1.0.0',
+      version: '2.0.0',
     });
   });
 }

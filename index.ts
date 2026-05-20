@@ -3,10 +3,11 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import staticPlugin from '@fastify/static';
 import path from 'path';
-import { setupDatabase } from './src/database';
+import { setupDatabase, seedTenants } from './src/database';
 import { webhookRoutes } from './src/handlers/webhook';
 import { dashboardRoutes } from './src/dashboard/routes';
 import { config } from './src/config';
+import { startReminderScheduler } from './src/services/reminders';
 
 const app = Fastify({
   logger: {
@@ -22,32 +23,35 @@ async function main(): Promise<void> {
   // 1. Initialize database
   setupDatabase();
 
-  // 2. Register CORS
+  // 2. Seed tenants (idempotent — only inserts if not present)
+  seedTenants();
+
+  // 3. Register CORS
   await app.register(cors, {
     origin: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
-  // 3. Serve static dashboard files
+  // 4. Serve static dashboard files
   await app.register(staticPlugin, {
     root: path.join(__dirname, 'src/dashboard/static'),
     prefix: '/',
     decorateReply: false,
   });
 
-  // 4. Register webhook routes (Evolution API)
+  // 5. Register webhook routes (Evolution API)
   await app.register(webhookRoutes, { prefix: '/webhook' });
 
-  // 5. Register dashboard REST API
+  // 6. Register dashboard REST API
   await app.register(dashboardRoutes, { prefix: '/api' });
 
-  // 6. Root route — serve dashboard
+  // 7. Root route — serve dashboard
   app.get('/', async (_req, reply) => {
     return reply.sendFile('index.html');
   });
 
-  // 7. 404 handler
+  // 8. 404 handler
   app.setNotFoundHandler(async (req, reply) => {
     if (req.url.startsWith('/api') || req.url.startsWith('/webhook')) {
       return reply.code(404).send({ success: false, error: 'Route not found' });
@@ -56,7 +60,7 @@ async function main(): Promise<void> {
     return reply.sendFile('index.html');
   });
 
-  // 8. Global error handler
+  // 9. Global error handler
   app.setErrorHandler(async (err, _req, reply) => {
     app.log.error(err);
     return reply.code(err.statusCode || 500).send({
@@ -65,7 +69,7 @@ async function main(): Promise<void> {
     });
   });
 
-  // 9. Start server
+  // 10. Start server
   try {
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
     console.log(`\n✅ Servidor rodando em http://0.0.0.0:${config.PORT}`);
@@ -76,6 +80,9 @@ async function main(): Promise<void> {
     app.log.error(err);
     process.exit(1);
   }
+
+  // 11. Start reminder scheduler (after server is up)
+  startReminderScheduler();
 }
 
 // Handle graceful shutdown
