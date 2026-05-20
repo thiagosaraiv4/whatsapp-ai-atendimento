@@ -122,6 +122,86 @@ html, body {
   letter-spacing: 0.5px;
 }
 
+/* ═══════════════════════════════════════
+   Tenant Selector
+══════════════════════════════════════ */
+.tenant-selector {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.tenant-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-sidebar);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
+}
+
+.tenant-selector select {
+  width: 100%;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: var(--text-white);
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  outline: none;
+}
+
+.tenant-selector select:focus {
+  border-color: var(--primary);
+}
+
+.tenant-selector select option {
+  background: #263347;
+  color: white;
+}
+
+/* Tenant badge in conversation list */
+.conv-tenant {
+  margin-top: 2px;
+}
+
+.tenant-badge {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--primary);
+  font-weight: 600;
+  background: #e8f1fb;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+/* Badge for tenant in chat header */
+.badge-tenant {
+  background: #e8f1fb;
+  color: var(--primary);
+  margin-left: 6px;
+  text-transform: none;
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+/* Pending professional badge */
+.badge-pending_professional { background: #e2d9f3; color: #5a2d82; }
+
+/* Metrics tenant label */
+.metrics-tenant-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 4px 0 8px 0;
+}
+
+.metrics-tenant-label.full-width {
+  grid-column: 1 / -1;
+}
+
 .sidebar-nav {
   flex: 1;
   padding: 12px 0;
@@ -904,7 +984,7 @@ tr:hover td {
 ══════════════════════════════════════ */
 @media (max-width: 768px) {
   .sidebar { width: 60px; min-width: 60px; }
-  .logo-text, .nav-label, .sidebar-footer { display: none; }
+  .logo-text, .nav-label, .sidebar-footer, .tenant-selector { display: none; }
   .logo-icon { width: 36px; height: 36px; font-size: 18px; }
   .nav-item { justify-content: center; padding: 12px; }
   .conversations-panel { width: 280px; min-width: 280px; }
