@@ -87,18 +87,20 @@ class WhatsAppService {
     return `${normalized}@s.whatsapp.net`;
   }
 
-  async sendTextMessage(phone: string, text: string): Promise<SendTextResponse> {
+  private resolveInstance(instance?: string | null): string {
+    return instance || config.EVOLUTION_INSTANCE;
+  }
+
+  async sendTextMessage(phone: string, text: string, instance?: string | null): Promise<SendTextResponse> {
     const normalizedPhone = this.normalizePhone(phone);
+    const inst = this.resolveInstance(instance);
 
     const response = await this.client.post<SendTextResponse>(
-      `/message/sendText/${config.EVOLUTION_INSTANCE}`,
-      {
-        number: normalizedPhone,
-        text,
-      }
+      `/message/sendText/${inst}`,
+      { number: normalizedPhone, text }
     );
 
-    console.log(`[WhatsApp] Message sent to ${normalizedPhone}`);
+    console.log(`[WhatsApp] Message sent to ${normalizedPhone} via instance "${inst}"`);
     return response.data;
   }
 
@@ -107,12 +109,14 @@ class WhatsAppService {
     title: string,
     description: string,
     buttonText: string,
-    options: ListOption[]
+    options: ListOption[],
+    instance?: string | null
   ): Promise<unknown> {
     const normalizedPhone = this.normalizePhone(phone);
+    const inst = this.resolveInstance(instance);
 
     const response = await this.client.post(
-      `/message/sendList/${config.EVOLUTION_INSTANCE}`,
+      `/message/sendList/${inst}`,
       {
         number: normalizedPhone,
         title,
@@ -132,14 +136,15 @@ class WhatsAppService {
       }
     );
 
-    console.log(`[WhatsApp] List message sent to ${normalizedPhone}`);
+    console.log(`[WhatsApp] List message sent to ${normalizedPhone} via instance "${inst}"`);
     return response.data;
   }
 
-  async markAsRead(phone: string, messageId: string): Promise<void> {
+  async markAsRead(phone: string, messageId: string, instance?: string | null): Promise<void> {
     const normalizedPhone = this.normalizePhone(phone);
+    const inst = this.resolveInstance(instance);
     try {
-      await this.client.post(`/message/markMessageAsRead/${config.EVOLUTION_INSTANCE}`, {
+      await this.client.post(`/message/markMessageAsRead/${inst}`, {
         readMessages: [
           {
             remoteJid: `${normalizedPhone}@s.whatsapp.net`,
@@ -149,27 +154,25 @@ class WhatsAppService {
         ],
       });
     } catch (err) {
-      // Mark as read is best-effort; don't throw
       console.warn(`[WhatsApp] Could not mark message as read: ${(err as Error).message}`);
     }
   }
 
-  async getInstanceStatus(): Promise<InstanceStatus> {
+  async getInstanceStatus(instance?: string | null): Promise<InstanceStatus> {
+    const inst = this.resolveInstance(instance);
     const response = await this.client.get<InstanceStatus>(
-      `/instance/fetchInstances`
+      `/instance/connectionState/${inst}`
     );
     return response.data;
   }
 
-  async sendTyping(phone: string, durationMs = 2000): Promise<void> {
+  async sendTyping(phone: string, durationMs = 2000, instance?: string | null): Promise<void> {
     const normalizedPhone = this.normalizePhone(phone);
+    const inst = this.resolveInstance(instance);
     try {
-      await this.client.post(`/message/sendPresence/${config.EVOLUTION_INSTANCE}`, {
+      await this.client.post(`/message/sendPresence/${inst}`, {
         number: normalizedPhone,
-        options: {
-          presence: 'composing',
-          delay: durationMs,
-        },
+        options: { presence: 'composing', delay: durationMs },
       });
     } catch {
       // Typing indicator is best-effort

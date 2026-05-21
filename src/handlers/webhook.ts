@@ -166,6 +166,7 @@ export async function webhookRoutes(
         fromMe,
         isGroup,
         pushName: data.pushName,
+        instance: body.instance,
       };
 
       // Process asynchronously — respond to Evolution API immediately (200 OK)
