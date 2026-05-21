@@ -29,6 +29,7 @@ export function setupDatabase(): void {
       name TEXT NOT NULL,
       type TEXT NOT NULL,
       whatsapp_phone TEXT,
+      evolution_instance TEXT,
       operator_phone TEXT NOT NULL,
       active INTEGER DEFAULT 1,
       config TEXT NOT NULL DEFAULT '{}'
@@ -125,6 +126,7 @@ export function setupDatabase(): void {
 
   // Migrate existing tables: add tenant_id column if missing (SQLite compatible)
   const alterStatements = [
+    { table: 'tenants', column: 'evolution_instance', def: 'TEXT' },
     { table: 'conversations', column: 'tenant_id', def: 'INTEGER DEFAULT 1' },
     { table: 'messages', column: 'tenant_id', def: 'INTEGER DEFAULT 1' },
     { table: 'appointments', column: 'tenant_id', def: 'INTEGER DEFAULT 1' },
@@ -167,6 +169,7 @@ export interface Tenant {
   name: string;
   type: 'ai_full' | 'collect_forward';
   whatsapp_phone: string | null;
+  evolution_instance: string | null;
   operator_phone: string;
   active: number;
   config: string; // JSON string
@@ -204,6 +207,12 @@ export function getTenantBySlug(slug: string): TenantWithConfig | undefined {
 export function getTenantByPhone(phone: string): TenantWithConfig | undefined {
   const database = getDb();
   const row = database.prepare('SELECT * FROM tenants WHERE whatsapp_phone = ? AND active = 1').get(phone) as Tenant | undefined;
+  return row ? parseTenant(row) : undefined;
+}
+
+export function getTenantByInstance(instance: string): TenantWithConfig | undefined {
+  const database = getDb();
+  const row = database.prepare('SELECT * FROM tenants WHERE evolution_instance = ? AND active = 1').get(instance) as Tenant | undefined;
   return row ? parseTenant(row) : undefined;
 }
 

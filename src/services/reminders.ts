@@ -42,7 +42,7 @@ async function sendReminders(): Promise<void> {
           `📅 Data: ${appt.date}\n\n` +
           `Caso precise cancelar ou remarcar, entre em contato conosco com antecedência. 😊`;
 
-        await whatsappService.sendTextMessage(appt.phone, reminderMsg);
+        await whatsappService.sendTextMessage(appt.phone, reminderMsg, tenant?.evolution_instance);
         markReminderSent(appt.id);
 
         console.log(`[Reminders] Reminder sent for appointment #${appt.id} to ${appt.phone}`);

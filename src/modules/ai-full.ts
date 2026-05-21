@@ -63,9 +63,11 @@ export class AiFullModule {
     // Get or create conversation record
     const conversation = getOrCreateConversation(normalizedPhone, tenant.id);
 
+    const inst = tenant.evolution_instance;
+
     // Mark message as read (best-effort)
     if (messageId) {
-      await whatsappService.markAsRead(normalizedPhone, messageId).catch(() => {});
+      await whatsappService.markAsRead(normalizedPhone, messageId, inst).catch(() => {});
     }
 
     // If conversation is closed, reopen it
@@ -78,7 +80,8 @@ export class AiFullModule {
     if (conversation.status === 'escalated') {
       await whatsappService.sendTextMessage(
         normalizedPhone,
-        '⏳ Sua conversa já foi encaminhada para um de nossos atendentes. Por favor, aguarde — em breve alguém entrará em contato com você.'
+        '⏳ Sua conversa já foi encaminhada para um de nossos atendentes. Por favor, aguarde — em breve alguém entrará em contato com você.',
+        inst
       );
       addMessage(conversation.id, 'user', messageText, tenant.id);
       return;
@@ -108,9 +111,11 @@ export class AiFullModule {
   ): Promise<void> {
     const phone = conversation.phone;
 
+    const inst = tenant.evolution_instance;
+
     try {
       // Show typing indicator
-      await whatsappService.sendTyping(phone, 2500).catch(() => {});
+      await whatsappService.sendTyping(phone, 2500, inst).catch(() => {});
 
       // Fetch recent conversation history
       const history = getConversationHistory(conversation.id, config.MAX_HISTORY_MESSAGES);
@@ -126,19 +131,16 @@ export class AiFullModule {
           const data = intent.schedulingData || {};
 
           if (data.name && data.service && data.date && data.time) {
-            // AI already collected all data — save appointment directly
             await this.completeScheduling(
               conversation,
               data as Required<Pick<SchedulingData, 'name' | 'service' | 'date' | 'time'>> & SchedulingData,
               tenant
             );
-            // Send the AI's clean response first if any
             if (intent.cleanResponse) {
-              await whatsappService.sendTextMessage(phone, intent.cleanResponse);
+              await whatsappService.sendTextMessage(phone, intent.cleanResponse, inst);
               addMessage(conversation.id, 'assistant', intent.cleanResponse, tenant.id);
             }
           } else {
-            // Partial data — enter manual collection flow
             const existingData: SchedulingData = {
               name: data.name,
               service: data.service,
@@ -154,7 +156,7 @@ export class AiFullModule {
         case 'escalation': {
           const reason = intent.escalationReason || 'Solicitação de atendimento humano';
           if (intent.cleanResponse) {
-            await whatsappService.sendTextMessage(phone, intent.cleanResponse);
+            await whatsappService.sendTextMessage(phone, intent.cleanResponse, inst);
             addMessage(conversation.id, 'assistant', intent.cleanResponse, tenant.id);
           }
           await this.handleEscalation(conversation, reason, tenant);
@@ -162,11 +164,9 @@ export class AiFullModule {
         }
 
         default: {
-          // Normal response
-          await whatsappService.sendTextMessage(phone, intent.cleanResponse);
+          await whatsappService.sendTextMessage(phone, intent.cleanResponse, inst);
           addMessage(conversation.id, 'assistant', intent.cleanResponse, tenant.id);
 
-          // Update state to ACTIVE after greeting
           if (conversation.state === 'GREETING') {
             updateConversationState(conversation.id, 'ACTIVE');
           }
@@ -177,7 +177,7 @@ export class AiFullModule {
       console.error('[AiFullModule] Error processing AI response:', err);
       const errorMsg =
         '❌ Desculpe, ocorreu um erro interno. Por favor, tente novamente em instantes.';
-      await whatsappService.sendTextMessage(phone, errorMsg).catch(() => {});
+      await whatsappService.sendTextMessage(phone, errorMsg, inst).catch(() => {});
       addMessage(conversation.id, 'assistant', errorMsg, tenant.id);
     }
   }
@@ -193,31 +193,32 @@ export class AiFullModule {
   ): Promise<void> {
     const phone = conversation.phone;
     const tenantId = tenant?.id;
+    const inst = tenant?.evolution_instance;
 
     if (aiIntroMessage) {
-      await whatsappService.sendTextMessage(phone, aiIntroMessage);
+      await whatsappService.sendTextMessage(phone, aiIntroMessage, inst);
       addMessage(conversation.id, 'assistant', aiIntroMessage, tenantId);
     }
 
     if (!existingData.name) {
       updateConversationState(conversation.id, 'SCHEDULING_COLLECT_NAME', existingData);
       const msg = '📋 Para realizar o agendamento, precisarei de algumas informações.\n\nPrimeiro, qual é o seu *nome completo*?';
-      await whatsappService.sendTextMessage(phone, msg);
+      await whatsappService.sendTextMessage(phone, msg, inst);
       addMessage(conversation.id, 'assistant', msg, tenantId);
     } else if (!existingData.service) {
       updateConversationState(conversation.id, 'SCHEDULING_COLLECT_SERVICE', existingData);
       const msg = `Obrigado, *${existingData.name}*! 😊\n\nQual *serviço* você deseja agendar?`;
-      await whatsappService.sendTextMessage(phone, msg);
+      await whatsappService.sendTextMessage(phone, msg, inst);
       addMessage(conversation.id, 'assistant', msg, tenantId);
     } else if (!existingData.date) {
       updateConversationState(conversation.id, 'SCHEDULING_COLLECT_DATE', existingData);
       const msg = `Ótimo! Serviço: *${existingData.service}*.\n\nQual *data* você prefere? (formato: DD/MM/AAAA)`;
-      await whatsappService.sendTextMessage(phone, msg);
+      await whatsappService.sendTextMessage(phone, msg, inst);
       addMessage(conversation.id, 'assistant', msg, tenantId);
     } else if (!existingData.time) {
       updateConversationState(conversation.id, 'SCHEDULING_COLLECT_TIME', existingData);
       const msg = `Perfeito! Data: *${existingData.date}*.\n\nQual *horário* você prefere? (formato: HH:MM)`;
-      await whatsappService.sendTextMessage(phone, msg);
+      await whatsappService.sendTextMessage(phone, msg, inst);
       addMessage(conversation.id, 'assistant', msg, tenantId);
     }
   }
@@ -231,6 +232,7 @@ export class AiFullModule {
     tenant: TenantWithConfig
   ): Promise<void> {
     const phone = conversation.phone;
+    const inst = tenant.evolution_instance;
     const currentState = conversation.state as AiFullState;
     const stateData: SchedulingData = conversation.state_data
       ? (JSON.parse(conversation.state_data) as SchedulingData)
@@ -241,7 +243,7 @@ export class AiFullModule {
         const name = userInput.trim();
         if (name.length < 2) {
           const msg = '❌ Por favor, informe seu nome completo.';
-          await whatsappService.sendTextMessage(phone, msg);
+          await whatsappService.sendTextMessage(phone, msg, inst);
           addMessage(conversation.id, 'assistant', msg, tenant.id);
           return;
         }
@@ -249,7 +251,7 @@ export class AiFullModule {
         updateConversationName(conversation.id, name);
         updateConversationState(conversation.id, 'SCHEDULING_COLLECT_SERVICE', stateData);
         const msg = `Obrigado, *${name}*! 😊\n\nQual *serviço* você deseja agendar?`;
-        await whatsappService.sendTextMessage(phone, msg);
+        await whatsappService.sendTextMessage(phone, msg, inst);
         addMessage(conversation.id, 'assistant', msg, tenant.id);
         break;
       }
@@ -258,14 +260,14 @@ export class AiFullModule {
         const service = userInput.trim();
         if (service.length < 2) {
           const msg = '❌ Por favor, informe o serviço desejado.';
-          await whatsappService.sendTextMessage(phone, msg);
+          await whatsappService.sendTextMessage(phone, msg, inst);
           addMessage(conversation.id, 'assistant', msg, tenant.id);
           return;
         }
         stateData.service = service;
         updateConversationState(conversation.id, 'SCHEDULING_COLLECT_DATE', stateData);
         const msg = `Ótimo! Serviço: *${service}* ✅\n\nQual *data* você prefere para o atendimento?\nPor favor, no formato *DD/MM/AAAA* (ex: 25/12/2025)`;
-        await whatsappService.sendTextMessage(phone, msg);
+        await whatsappService.sendTextMessage(phone, msg, inst);
         addMessage(conversation.id, 'assistant', msg, tenant.id);
         break;
       }
@@ -277,7 +279,7 @@ export class AiFullModule {
 
         if (!match) {
           const msg = '❌ Data inválida. Por favor, use o formato *DD/MM/AAAA* (exemplo: 25/12/2025).';
-          await whatsappService.sendTextMessage(phone, msg);
+          await whatsappService.sendTextMessage(phone, msg, inst);
           addMessage(conversation.id, 'assistant', msg, tenant.id);
           return;
         }
@@ -290,7 +292,7 @@ export class AiFullModule {
           dateObj.getDate() !== Number(day)
         ) {
           const msg = '❌ Data inválida. Verifique o dia e mês informados.';
-          await whatsappService.sendTextMessage(phone, msg);
+          await whatsappService.sendTextMessage(phone, msg, inst);
           addMessage(conversation.id, 'assistant', msg, tenant.id);
           return;
         }
@@ -298,7 +300,7 @@ export class AiFullModule {
         stateData.date = dateInput;
         updateConversationState(conversation.id, 'SCHEDULING_COLLECT_TIME', stateData);
         const msg = `Data: *${dateInput}* ✅\n\nQual *horário* você prefere?\nPor favor, no formato *HH:MM* (ex: 14:30)`;
-        await whatsappService.sendTextMessage(phone, msg);
+        await whatsappService.sendTextMessage(phone, msg, inst);
         addMessage(conversation.id, 'assistant', msg, tenant.id);
         break;
       }
@@ -310,7 +312,7 @@ export class AiFullModule {
 
         if (!match) {
           const msg = '❌ Horário inválido. Por favor, use o formato *HH:MM* (exemplo: 14:30).';
-          await whatsappService.sendTextMessage(phone, msg);
+          await whatsappService.sendTextMessage(phone, msg, inst);
           addMessage(conversation.id, 'assistant', msg, tenant.id);
           return;
         }
@@ -318,7 +320,7 @@ export class AiFullModule {
         const [, hour, minute] = match;
         if (Number(hour) > 23 || Number(minute) > 59) {
           const msg = '❌ Horário inválido. Use um horário entre 00:00 e 23:59.';
-          await whatsappService.sendTextMessage(phone, msg);
+          await whatsappService.sendTextMessage(phone, msg, inst);
           addMessage(conversation.id, 'assistant', msg, tenant.id);
           return;
         }
@@ -334,7 +336,7 @@ export class AiFullModule {
           `🕐 Horário: *${stateData.time}*\n\n` +
           `Confirma o agendamento? Responda *SIM* para confirmar ou *NÃO* para cancelar.`;
 
-        await whatsappService.sendTextMessage(phone, confirmMsg);
+        await whatsappService.sendTextMessage(phone, confirmMsg, inst);
         addMessage(conversation.id, 'assistant', confirmMsg, tenant.id);
         break;
       }
@@ -352,7 +354,7 @@ export class AiFullModule {
           } else {
             updateConversationState(conversation.id, 'ACTIVE');
             const msg = '❌ Dados de agendamento incompletos. Por favor, inicie novamente digitando que deseja agendar um serviço.';
-            await whatsappService.sendTextMessage(phone, msg);
+            await whatsappService.sendTextMessage(phone, msg, inst);
             addMessage(conversation.id, 'assistant', msg, tenant.id);
           }
         } else if (
@@ -363,11 +365,11 @@ export class AiFullModule {
         ) {
           updateConversationState(conversation.id, 'ACTIVE');
           const msg = '✅ Agendamento cancelado. Se precisar de mais alguma coisa, é só falar! 😊';
-          await whatsappService.sendTextMessage(phone, msg);
+          await whatsappService.sendTextMessage(phone, msg, inst);
           addMessage(conversation.id, 'assistant', msg, tenant.id);
         } else {
           const msg = 'Por favor, responda *SIM* para confirmar o agendamento ou *NÃO* para cancelar.';
-          await whatsappService.sendTextMessage(phone, msg);
+          await whatsappService.sendTextMessage(phone, msg, inst);
           addMessage(conversation.id, 'assistant', msg, tenant.id);
         }
         break;
@@ -384,6 +386,7 @@ export class AiFullModule {
     tenant: TenantWithConfig
   ): Promise<void> {
     const phone = conversation.phone;
+    const inst = tenant.evolution_instance;
 
     try {
       // Build scheduled_at as ISO string for reminder queries
@@ -427,7 +430,7 @@ export class AiFullModule {
         `Você receberá uma confirmação em breve. Caso precise cancelar ou reagendar, entre em contato com antecedência.\n\n` +
         `Obrigado por escolher a *${tenant.name}*! 😊`;
 
-      await whatsappService.sendTextMessage(phone, successMsg);
+      await whatsappService.sendTextMessage(phone, successMsg, inst);
       addMessage(conversation.id, 'assistant', successMsg, tenant.id);
 
       // Notify operator
@@ -441,7 +444,7 @@ export class AiFullModule {
         `🕐 Horário: ${data.time}` +
         (data.notes ? `\n📝 Obs: ${data.notes}` : '');
 
-      await whatsappService.sendTextMessage(tenant.operator_phone, operatorMsg).catch((err) => {
+      await whatsappService.sendTextMessage(tenant.operator_phone, operatorMsg, inst).catch((err) => {
         console.error('[AiFullModule] Failed to notify operator about appointment:', err);
       });
 
@@ -451,7 +454,7 @@ export class AiFullModule {
       updateConversationState(conversation.id, 'ACTIVE');
       const errorMsg =
         '❌ Ocorreu um erro ao salvar seu agendamento. Por favor, tente novamente ou entre em contato diretamente conosco.';
-      await whatsappService.sendTextMessage(phone, errorMsg);
+      await whatsappService.sendTextMessage(phone, errorMsg, inst);
       addMessage(conversation.id, 'assistant', errorMsg, tenant.id);
     }
   }
@@ -461,11 +464,11 @@ export class AiFullModule {
    */
   async handleEscalation(conversation: Conversation, reason: string, tenant: TenantWithConfig): Promise<void> {
     const phone = conversation.phone;
+    const inst = tenant.evolution_instance;
 
     try {
       const escalation = escalateConversation(conversation.id, reason, tenant.id);
 
-      // Notify operator via WhatsApp
       const operatorMsg =
         `🚨 *Atendimento Requer Atenção Humana*\n` +
         `🏢 Tenant: ${tenant.name}\n\n` +
@@ -474,7 +477,7 @@ export class AiFullModule {
         `📝 Motivo: ${reason}\n\n` +
         `Por favor, entre em contato com o cliente o quanto antes.`;
 
-      await whatsappService.sendTextMessage(tenant.operator_phone, operatorMsg).catch((err) => {
+      await whatsappService.sendTextMessage(tenant.operator_phone, operatorMsg, inst).catch((err) => {
         console.error('[AiFullModule] Failed to notify operator:', err);
       });
 

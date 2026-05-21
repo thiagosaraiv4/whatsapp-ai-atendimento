@@ -1,6 +1,6 @@
 import { conversationService } from '../services/conversation';
 import { whatsappService } from '../services/whatsapp';
-import { getTenantByPhone, listTenants, TenantWithConfig } from '../database';
+import { getTenantByPhone, getTenantByInstance, listTenants, TenantWithConfig } from '../database';
 
 export interface IncomingMessage {
   phone: string;
@@ -9,31 +9,37 @@ export interface IncomingMessage {
   fromMe: boolean;
   isGroup: boolean;
   pushName?: string;
+  instance?: string;
 }
 
 /**
  * Resolves the tenant for an incoming message.
  *
  * Routing priority:
- * 1. Match by whatsapp_phone configured on the tenant (for production use
- *    when each tenant has a dedicated WhatsApp number).
- * 2. Fallback to the first active tenant (tenant id=1, barbearia-castilho)
- *    for testing/development when tenant phone numbers aren't configured yet.
- *
- * TODO: Replace the fallback with proper phone-based routing once each tenant
- * has their own Evolution API instance / WhatsApp number configured in the DB.
+ * 1. Match by Evolution API instance name (evolution_instance column).
+ *    Each tenant should have their own Evolution API instance — set via:
+ *    UPDATE tenants SET evolution_instance='nome-da-instancia' WHERE slug='barbearia-castilho';
+ * 2. Match by whatsapp_phone (legacy / alternative).
+ * 3. Fallback to first active tenant for development when not configured yet.
  */
-function resolveTenant(phone: string): TenantWithConfig | null {
-  // 1. Try to find tenant by the incoming phone number
+function resolveTenant(phone: string, instance?: string): TenantWithConfig | null {
+  // 1. Match by Evolution API instance name (primary production routing)
+  if (instance) {
+    const byInstance = getTenantByInstance(instance);
+    if (byInstance) return byInstance;
+  }
+
+  // 2. Match by whatsapp_phone
   const byPhone = getTenantByPhone(phone);
   if (byPhone) return byPhone;
 
-  // 2. Fallback: use first active tenant
+  // 3. Fallback: first active tenant (dev/single-instance mode)
   const allTenants = listTenants();
   if (allTenants.length > 0) {
     console.log(
-      `[Pipeline] No tenant matched phone ${phone} — falling back to tenant "${allTenants[0].slug}". ` +
-      `Configure whatsapp_phone on tenants for production routing.`
+      `[Pipeline] No tenant matched instance="${instance}" or phone=${phone} — ` +
+      `falling back to "${allTenants[0].slug}". ` +
+      `Set evolution_instance on tenant rows for multi-tenant routing.`
     );
     return allTenants[0];
   }
@@ -73,7 +79,7 @@ export async function processPipeline(message: IncomingMessage): Promise<void> {
   );
 
   // Resolve tenant
-  const tenant = resolveTenant(phone);
+  const tenant = resolveTenant(phone, message.instance);
   if (!tenant) {
     console.error('[Pipeline] No active tenant found — cannot process message');
     return;
