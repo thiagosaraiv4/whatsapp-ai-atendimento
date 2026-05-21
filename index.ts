@@ -34,10 +34,12 @@ async function main(): Promise<void> {
   });
 
   // 4. Serve static dashboard files
+  // Static files live in src/dashboard/static (not compiled by tsc)
+  // From dist/index.js, __dirname = <project>/dist, so go up one level
+  const staticRoot = path.join(__dirname, '..', 'src', 'dashboard', 'static');
   await app.register(staticPlugin, {
-    root: path.join(__dirname, 'src/dashboard/static'),
+    root: staticRoot,
     prefix: '/',
-    decorateReply: false,
   });
 
   // 5. Register webhook routes (Evolution API)
