@@ -34,8 +34,7 @@ for (const c of cases) {
   const firstRank = ids.findIndex((id) => expected.includes(id));
 
   if (found.length) hits++;
-  // Para perguntas com muitos trechos válidos (ex.: "quais serviços"), o máximo alcançável é k.
-  recallSum += found.length / Math.min(expected.length, k);
+  recallSum += found.length / expected.length;
   rrSum += firstRank >= 0 ? 1 / (firstRank + 1) : 0;
   promptChars += buildSystemPrompt(index.profile, results).length;
 
