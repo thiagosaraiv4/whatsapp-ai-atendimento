@@ -17,7 +17,7 @@ import {
   Conversation,
   TenantWithConfig,
 } from '../database';
-import { aiService } from '../services/ai';
+import { aiService, SchedulingData } from '../services/ai';
 import { whatsappService } from '../services/whatsapp';
 import { config } from '../config';
 
@@ -31,14 +31,6 @@ export type AiFullState =
   | 'SCHEDULING_CONFIRM'
   | 'ESCALATED'
   | 'CLOSED';
-
-interface SchedulingData {
-  name?: string;
-  service?: string;
-  date?: string;
-  time?: string;
-  notes?: string;
-}
 
 const SCHEDULING_STATES: AiFullState[] = [
   'SCHEDULING_COLLECT_NAME',
@@ -120,52 +112,29 @@ export class AiFullModule {
       // Fetch recent conversation history
       const history = getConversationHistory(conversation.id, config.MAX_HISTORY_MESSAGES);
 
-      // Get AI response (tenant-aware)
-      const rawResponse = await aiService.chat(history, userMessage, tenant);
+      // RAG + tool calling: o agente devolve uma ação estruturada (reply | schedule | escalate)
+      const action = await aiService.respond(history, userMessage, tenant);
 
-      // Detect special intents
-      const intent = aiService.detectIntent(rawResponse);
-
-      switch (intent.type) {
-        case 'scheduling': {
-          const data = intent.schedulingData || {};
-
-          if (data.name && data.service && data.date && data.time) {
-            await this.completeScheduling(
-              conversation,
-              data as Required<Pick<SchedulingData, 'name' | 'service' | 'date' | 'time'>> & SchedulingData,
-              tenant
-            );
-            if (intent.cleanResponse) {
-              await whatsappService.sendTextMessage(phone, intent.cleanResponse, inst);
-              addMessage(conversation.id, 'assistant', intent.cleanResponse, tenant.id);
-            }
-          } else {
-            const existingData: SchedulingData = {
-              name: data.name,
-              service: data.service,
-              date: data.date,
-              time: data.time,
-              notes: data.notes,
-            };
-            await this.startSchedulingCollection(conversation, existingData, intent.cleanResponse, tenant);
-          }
+      switch (action.type) {
+        case 'schedule': {
+          // Coleta o que faltar; com tudo preenchido vai direto para a confirmação SIM/NÃO
+          // (o LLM pode ter entendido algo errado, então não gravamos sem o cliente confirmar).
+          await this.startSchedulingCollection(conversation, action.data, action.text, tenant);
           break;
         }
 
-        case 'escalation': {
-          const reason = intent.escalationReason || 'Solicitação de atendimento humano';
-          if (intent.cleanResponse) {
-            await whatsappService.sendTextMessage(phone, intent.cleanResponse, inst);
-            addMessage(conversation.id, 'assistant', intent.cleanResponse, tenant.id);
-          }
-          await this.handleEscalation(conversation, reason, tenant);
+        case 'escalate': {
+          const text = action.text || '🙋 Vou transferir você para um de nossos atendentes. Em breve alguém entra em contato por aqui.';
+          await whatsappService.sendTextMessage(phone, text, inst);
+          addMessage(conversation.id, 'assistant', text, tenant.id);
+          await this.handleEscalation(conversation, action.reason, tenant);
           break;
         }
 
         default: {
-          await whatsappService.sendTextMessage(phone, intent.cleanResponse, inst);
-          addMessage(conversation.id, 'assistant', intent.cleanResponse, tenant.id);
+          const text = action.text || 'Desculpe, não consegui entender. Pode reformular sua mensagem? 🙂';
+          await whatsappService.sendTextMessage(phone, text, inst);
+          addMessage(conversation.id, 'assistant', text, tenant.id);
 
           if (conversation.state === 'GREETING') {
             updateConversationState(conversation.id, 'ACTIVE');
@@ -220,7 +189,23 @@ export class AiFullModule {
       const msg = `Perfeito! Data: *${existingData.date}*.\n\nQual *horário* você prefere? (formato: HH:MM)`;
       await whatsappService.sendTextMessage(phone, msg, inst);
       addMessage(conversation.id, 'assistant', msg, tenantId);
+    } else {
+      updateConversationState(conversation.id, 'SCHEDULING_CONFIRM', existingData);
+      const msg = this.buildConfirmMessage(existingData);
+      await whatsappService.sendTextMessage(phone, msg, inst);
+      addMessage(conversation.id, 'assistant', msg, tenantId);
     }
+  }
+
+  private buildConfirmMessage(data: SchedulingData): string {
+    return (
+      `📋 *Resumo do Agendamento*\n\n` +
+      `👤 Nome: *${data.name}*\n` +
+      `🔧 Serviço: *${data.service}*\n` +
+      `📅 Data: *${data.date}*\n` +
+      `🕐 Horário: *${data.time}*\n\n` +
+      `Confirma o agendamento? Responda *SIM* para confirmar ou *NÃO* para cancelar.`
+    );
   }
 
   /**
@@ -328,13 +313,7 @@ export class AiFullModule {
         stateData.time = timeInput;
         updateConversationState(conversation.id, 'SCHEDULING_CONFIRM', stateData);
 
-        const confirmMsg =
-          `📋 *Resumo do Agendamento*\n\n` +
-          `👤 Nome: *${stateData.name}*\n` +
-          `🔧 Serviço: *${stateData.service}*\n` +
-          `📅 Data: *${stateData.date}*\n` +
-          `🕐 Horário: *${stateData.time}*\n\n` +
-          `Confirma o agendamento? Responda *SIM* para confirmar ou *NÃO* para cancelar.`;
+        const confirmMsg = this.buildConfirmMessage(stateData);
 
         await whatsappService.sendTextMessage(phone, confirmMsg, inst);
         addMessage(conversation.id, 'assistant', confirmMsg, tenant.id);

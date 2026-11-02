@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
 import path from 'path';
+import { DEFAULT_AGENT_OPTIONS } from './ai/agent';
 
 dotenv.config();
 
@@ -34,9 +35,11 @@ export const config = {
   TENANTS_DATA_PATH: path.resolve('./data/tenants'),
   STATIC_PATH: path.resolve('./src/dashboard/static'),
   MAX_HISTORY_MESSAGES: 10,
-  AI_MODEL: 'llama-3.3-70b-versatile',
-  AI_MAX_TOKENS: 1024,
-  AI_TEMPERATURE: 0.7,
+  // Mesmos valores usados pelo eval (evals/run-intent.ts), para o resultado medir o que roda em produção.
+  AI_MODEL: DEFAULT_AGENT_OPTIONS.model,
+  AI_MAX_TOKENS: DEFAULT_AGENT_OPTIONS.maxTokens,
+  AI_TEMPERATURE: DEFAULT_AGENT_OPTIONS.temperature,
+  AI_RETRIEVAL_TOP_K: DEFAULT_AGENT_OPTIONS.topK,
 };
 
 export type Config = typeof config;
