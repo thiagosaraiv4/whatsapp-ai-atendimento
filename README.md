@@ -148,7 +148,7 @@ Mede Hit@k, Recall@k, MRR e o tamanho do prompt com RAG vs. com a base inteira. 
 | Métrica | Valor |
 |---|---|
 | Hit@4 | 100% (21/21) |
-| Recall@4 | 97,6% |
+| Recall@4 | 96,7% |
 | MRR | 0,976 |
 | Tamanho do prompt | 42,5% menor que com a base inteira |
 
