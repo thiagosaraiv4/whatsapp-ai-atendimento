@@ -1,0 +1,84 @@
+{
+  "description": "Mensagens de teste para a Barbearia Castilho com a intenção esperada (reply | schedule | escalate) e, quando aplicável, os trechos da base que deveriam ser recuperados.",
+  "tenant": {
+    "slug": "barbearia-castilho",
+    "name": "Barbearia Castilho",
+    "knowledge_base": "data/tenants/barbearia-castilho/knowledge-base.json",
+    "scheduling_enabled": true,
+    "cancellation_policy": "Cancelamentos devem ser feitos com pelo menos 2 horas de antecedência."
+  },
+  "cases": [
+    { "id": "preco-corte", "message": "Quanto custa o corte?", "expected_intent": "reply", "expected_chunks": ["service:corte"] },
+    { "id": "preco-barba", "message": "qual o valor da barba?", "expected_intent": "reply", "expected_chunks": ["service:barba"] },
+    { "id": "preco-combo", "message": "Quanto fica corte e barba juntos?", "expected_intent": "reply", "expected_chunks": ["service:corte-barba"] },
+    { "id": "preco-hidratacao", "message": "Vocês fazem hidratação? Quanto é?", "expected_intent": "reply", "expected_chunks": ["service:hidratacao"] },
+    { "id": "sobrancelha", "message": "faz sobrancelha?", "expected_intent": "reply", "expected_chunks": ["service:sobrancelha"] },
+    { "id": "lista-servicos", "message": "Quais serviços vocês oferecem?", "expected_intent": "reply", "expected_chunks": ["service:corte", "service:barba", "service:corte-barba", "service:hidratacao", "service:sobrancelha"] },
+    { "id": "horario-abre", "message": "Que horas vocês abrem?", "expected_intent": "reply", "expected_chunks": ["info:horario"] },
+    { "id": "horario-domingo", "message": "Abre domingo?", "expected_intent": "reply", "expected_chunks": ["info:horario"] },
+    { "id": "horario-sabado", "message": "Vocês funcionam no sábado?", "expected_intent": "reply", "expected_chunks": ["info:horario"] },
+    { "id": "pagamento-cartao", "message": "Aceita cartão de crédito?", "expected_intent": "reply", "expected_chunks": ["info:pagamento", "faq:5"] },
+    { "id": "pagamento-pix", "message": "Posso pagar no pix?", "expected_intent": "reply", "expected_chunks": ["info:pagamento", "faq:5"] },
+    { "id": "crianca", "message": "Atendem criança?", "expected_intent": "reply", "expected_chunks": ["faq:2"] },
+    { "id": "crianca-filho", "message": "Meu filho tem 5 anos, vocês cortam cabelo de criança?", "expected_intent": "reply", "expected_chunks": ["faq:2"] },
+    { "id": "tempo-corte", "message": "Quanto tempo demora um corte?", "expected_intent": "reply", "expected_chunks": ["faq:3", "service:corte"] },
+    { "id": "precisa-agendar", "message": "Preciso marcar horário ou posso chegar direto?", "expected_intent": "reply", "expected_chunks": ["faq:1"] },
+    { "id": "ordem-chegada", "message": "Vocês atendem por ordem de chegada?", "expected_intent": "reply", "expected_chunks": ["faq:1"] },
+    { "id": "como-cancelar", "message": "Como faço para cancelar um horário marcado?", "expected_intent": "reply", "expected_chunks": ["faq:4", "info:cancelamento"] },
+    { "id": "instagram", "message": "Qual o instagram de vocês?", "expected_intent": "reply", "expected_chunks": ["info:contato"] },
+    { "id": "endereco", "message": "Onde fica a barbearia?", "expected_intent": "reply", "expected_chunks": ["info:endereco"] },
+    { "id": "saudacao", "message": "Oi, boa tarde!", "expected_intent": "reply" },
+    { "id": "agradecimento", "message": "Obrigado, até mais!", "expected_intent": "reply" },
+    { "id": "fora-da-base", "message": "Vocês fazem luzes no cabelo?", "expected_intent": "reply" },
+    {
+      "id": "followup-preco",
+      "history": [
+        { "role": "user", "content": "Vocês fazem barba?" },
+        { "role": "assistant", "content": "Fazemos sim! 😊 Posso ajudar com mais alguma coisa?" }
+      ],
+      "message": "e quanto custa?",
+      "expected_intent": "reply",
+      "expected_chunks": ["service:barba"]
+    },
+    {
+      "id": "followup-horario",
+      "history": [
+        { "role": "user", "content": "Que horas vocês abrem no sábado?" },
+        { "role": "assistant", "content": "No sábado abrimos às 9h e fechamos às 19h. 💈" }
+      ],
+      "message": "e no domingo?",
+      "expected_intent": "reply",
+      "expected_chunks": ["info:horario"]
+    },
+
+    { "id": "agendar-corte", "message": "Quero agendar um corte", "expected_intent": "schedule" },
+    { "id": "agendar-amanha", "message": "Dá pra marcar um horário amanhã?", "expected_intent": "schedule" },
+    { "id": "agendar-combo-sexta", "message": "Queria marcar barba e cabelo pra sexta às 15h", "expected_intent": "schedule" },
+    { "id": "agendar-completo", "message": "Meu nome é João Silva, quero agendar um corte dia 20/11/2026 às 14:00", "expected_intent": "schedule" },
+    { "id": "agendar-hoje", "message": "Tem horário hoje à tarde? Queria cortar o cabelo", "expected_intent": "schedule" },
+    { "id": "agendar-hidratacao", "message": "Gostaria de agendar uma hidratação", "expected_intent": "schedule" },
+    { "id": "agendar-sobrancelha", "message": "agenda pra mim sobrancelha sábado de manhã", "expected_intent": "schedule" },
+    { "id": "agendar-filho", "message": "Quero marcar um horário pro meu filho", "expected_intent": "schedule" },
+    { "id": "agendar-reservar", "message": "Pode reservar um horário pra mim?", "expected_intent": "schedule" },
+    {
+      "id": "agendar-apos-preco",
+      "history": [
+        { "role": "user", "content": "Quanto custa o corte?" },
+        { "role": "assistant", "content": "O corte custa R$ 45 e leva em média 45 minutos. ✂️" }
+      ],
+      "message": "Beleza, quero marcar então",
+      "expected_intent": "schedule"
+    },
+
+    { "id": "escalar-atendente", "message": "Quero falar com um atendente", "expected_intent": "escalate" },
+    { "id": "escalar-pessoa", "message": "Posso falar com uma pessoa de verdade?", "expected_intent": "escalate" },
+    { "id": "escalar-robo", "message": "Você é um robô? Quero falar com gente", "expected_intent": "escalate" },
+    { "id": "escalar-espera", "message": "Péssimo atendimento, fiquei 1 hora esperando e ninguém me atendeu", "expected_intent": "escalate" },
+    { "id": "escalar-reembolso", "message": "O corte ficou horrível, quero meu dinheiro de volta", "expected_intent": "escalate" },
+    { "id": "escalar-cobranca", "message": "Fui cobrado duas vezes no cartão", "expected_intent": "escalate" },
+    { "id": "escalar-raiva", "message": "Vocês são uma piada, nunca mais volto aí", "expected_intent": "escalate" },
+    { "id": "escalar-dono", "message": "Preciso falar com o Castilho diretamente, é urgente", "expected_intent": "escalate" },
+    { "id": "escalar-objeto", "message": "Esqueci minha carteira aí ontem, alguém achou?", "expected_intent": "escalate" },
+    { "id": "escalar-parceria", "message": "Tenho uma proposta de parceria comercial para a barbearia", "expected_intent": "escalate" }
+  ]
+}
