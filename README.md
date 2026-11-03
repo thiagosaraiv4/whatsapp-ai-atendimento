@@ -4,6 +4,8 @@ Sistema completo de atendimento ao cliente via WhatsApp com IA (Groq/Llama 3.3),
 
 O agente usa **RAG** (busca só os trechos relevantes da base), **tool calling** (`agendar_servico`, `escalar_humano`) e tem um **conjunto de avaliação** que mede a porcentagem de acerto. Detalhes em [Arquitetura de IA](#arquitetura-de-ia).
 
+> Os dois negócios em `data/tenants/` (Barbearia Castilho e Psicóloga Prylucki) são exemplos fictícios, criados para demonstrar o sistema e os evals.
+
 ## Stack
 
 | Camada | Tecnologia |
@@ -31,7 +33,7 @@ O agente usa **RAG** (busca só os trechos relevantes da base), **tool calling**
 
 ```bash
 # 1. Clone o repositório
-git clone <repo-url>
+git clone https://github.com/thiagosaraiv4/whatsapp-ai-atendimento.git
 cd whatsapp-ai-atendimento
 
 # 2. Instale as dependências
