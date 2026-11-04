@@ -13,7 +13,7 @@
  *
  * Uso:
  *   GROQ_API_KEY=... npm run eval
- *   npm run eval -- --model llama-3.1-8b-instant --limit 10 --min-accuracy 0.85
+ *   npm run eval -- --model openai/gpt-oss-20b --limit 10 --min-accuracy 0.85
  */
 
 import 'dotenv/config';

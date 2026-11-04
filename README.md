@@ -1,6 +1,6 @@
 # WhatsApp AI – Automação de Atendimento
 
-Sistema completo de atendimento ao cliente via WhatsApp com IA (Groq/Llama 3.3), dashboard web, agendamento de serviços e escalonamento para humanos.
+Sistema completo de atendimento ao cliente via WhatsApp com IA (Groq, gpt-oss-120b), dashboard web, agendamento de serviços e escalonamento para humanos.
 
 O agente usa **RAG** (busca só os trechos relevantes da base), **tool calling** (`agendar_servico`, `escalar_humano`) e tem um **conjunto de avaliação** que mede a porcentagem de acerto. Detalhes em [Arquitetura de IA](#arquitetura-de-ia).
 
@@ -11,7 +11,7 @@ O agente usa **RAG** (busca só os trechos relevantes da base), **tool calling**
 | Camada | Tecnologia |
 |---|---|
 | Servidor HTTP | Fastify (Node.js + TypeScript) |
-| IA | Groq SDK — Llama 3.3 70B (gratuito), com RAG (BM25) e tool calling |
+| IA | Groq SDK — openai/gpt-oss-120b, com RAG (BM25) e tool calling |
 | WhatsApp | Evolution API |
 | Banco de dados | SQLite (better-sqlite3) |
 | Dashboard | HTML/JS/CSS puro (sem build) |
@@ -161,7 +161,7 @@ aparece de verdade quando a base cresce.
 
 ```bash
 GROQ_API_KEY=... npm run eval
-npm run eval -- --model llama-3.1-8b-instant --limit 10 --min-accuracy 0.85
+npm run eval -- --model openai/gpt-oss-20b --limit 10 --min-accuracy 0.85
 ```
 
 Roda cada mensagem pelo mesmo agente de produção (mesmo modelo, temperatura e top-k, definidos em

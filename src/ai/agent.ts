@@ -18,7 +18,7 @@ import { BM25Retriever, RetrievedChunk, Retriever } from './retriever';
 import { AgentAction, getTools, toAction } from './tools';
 
 export const DEFAULT_AGENT_OPTIONS = {
-  model: 'llama-3.3-70b-versatile',
+  model: 'openai/gpt-oss-120b',
   maxTokens: 1024,
   temperature: 0.3,
   topK: 4,
