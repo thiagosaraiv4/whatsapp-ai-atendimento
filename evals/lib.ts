@@ -35,7 +35,7 @@ export function loadDataset(file = path.join(__dirname, 'dataset.json')): EvalDa
   return JSON.parse(fs.readFileSync(file, 'utf-8')) as EvalDataset;
 }
 
-export function buildIndex(dataset: EvalDataset): KnowledgeIndex {
+export function buildIndex(dataset: Pick<EvalDataset, 'tenant'>): KnowledgeIndex {
   const t = dataset.tenant;
   return new KnowledgeIndex({
     name: t.name,
@@ -43,6 +43,21 @@ export function buildIndex(dataset: EvalDataset): KnowledgeIndex {
     schedulingEnabled: t.scheduling_enabled,
     cancellationPolicy: t.cancellation_policy,
   });
+}
+
+/** Repete a chamada em 429 (limite de requisições) e erros 5xx, esperando cada vez mais. */
+export async function withRetry<T>(fn: () => Promise<T>, attempts = 5): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if (i >= attempts - 1 || (status !== 429 && (status ?? 0) < 500)) throw err;
+      const wait = 2000 * 2 ** i;
+      console.warn(`  (HTTP ${status}, tentando de novo em ${wait / 1000}s)`);
+      await new Promise((r) => setTimeout(r, wait));
+    }
+  }
 }
 
 export function getArg(name: string): string | undefined {

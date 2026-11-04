@@ -22,23 +22,9 @@ import path from 'path';
 import Groq from 'groq-sdk';
 import { DEFAULT_AGENT_OPTIONS, SupportAgent } from '../src/ai/agent';
 import { IntentLabel } from '../src/ai/tools';
-import { EvalCase, buildIndex, getArg, loadDataset, pct, percentile } from './lib';
+import { EvalCase, buildIndex, getArg, loadDataset, pct, percentile, withRetry } from './lib';
 
 const LABELS: IntentLabel[] = ['reply', 'schedule', 'escalate'];
-
-async function withRetry<T>(fn: () => Promise<T>, attempts = 5): Promise<T> {
-  for (let i = 0; ; i++) {
-    try {
-      return await fn();
-    } catch (err) {
-      const status = (err as { status?: number }).status;
-      if (i >= attempts - 1 || (status !== 429 && (status ?? 0) < 500)) throw err;
-      const wait = 2000 * 2 ** i;
-      console.warn(`  (HTTP ${status}, tentando de novo em ${wait / 1000}s)`);
-      await new Promise((r) => setTimeout(r, wait));
-    }
-  }
-}
 
 async function main() {
   if (!process.env.GROQ_API_KEY) {

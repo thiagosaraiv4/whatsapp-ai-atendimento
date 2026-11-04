@@ -10,7 +10,8 @@
     "setup": "node -e \"require('./dist/database').setupDatabase()\"",
     "test": "tsx --test tests/*.test.ts",
     "eval": "tsx evals/run-intent.ts",
-    "eval:retrieval": "tsx evals/run-retrieval.ts"
+    "eval:retrieval": "tsx evals/run-retrieval.ts",
+    "eval:safety": "tsx evals/run-safety.ts"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
